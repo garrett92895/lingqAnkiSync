@@ -95,7 +95,7 @@ def CreateNoteType(languageCode: str):
 
     with open(os.path.join(resourceFolder, "back.html"), "r") as f:
         html = f.read()
-        if languageCode and languageCode in _contextReverseLinks:
+        if languageCode in _contextReverseLinks:
             template["afmt"] = html.replace(
                 '<div class="ReverseContextPlaceholder"></div>',
                 f"""

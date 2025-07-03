@@ -46,7 +46,7 @@ class ActionHandler:
         return len(cardsToIncrease), len(cardsToDecrease), successfulUpdates
 
     def _CheckLanguageCode(self, languageCode: str):
-        if languageCode and languageCode not in lingqLangcodes:
+        if languageCode not in lingqLangcodes:
             raise ValueError(
                 f'Language code "{languageCode}" is not valid. Examples include "es", "de", "ja", etc.'
             )
