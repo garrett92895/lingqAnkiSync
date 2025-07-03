@@ -110,17 +110,17 @@ class LingqApi:
         self.rateLimitCallback = None
         return successfulUpdates
 
-    def _GetLingqStatus(self, lingqPk):
+    def _GetLevel(self, lingqPk):
         url = f"{self._baseUrl}/{lingqPk}/"
         response = self._GetSinglePage(url)
-        internalStatus = response.json()["status"]
+        status = response.json()["status"]
         extendedStatus = response.json()["extended_status"]
 
-        return Converter.LingqInternalStatusToStatus(internalStatus, extendedStatus)
+        return Converter.LingqStatusToLevel(status, extendedStatus)
 
     def _ShouldUpdate(self, lingq) -> bool:
-        currentCardStatus = Converter.LingqInternalStatusToStatus(
+        currentLevel = Converter.LingqStatusToLevel(
             lingq.status, lingq.extendedStatus
         )
-        lingqApiStatus = self._GetLingqStatus(lingq.primaryKey)
-        return lingqApiStatus != currentCardStatus
+        lingqApiLevel = self._GetLevel(lingq.primaryKey)
+        return lingqApiLevel != currentLevel

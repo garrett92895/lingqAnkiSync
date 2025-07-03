@@ -23,7 +23,7 @@ class TestUIActionHandler:
                 word="hola",
                 translations=["hello"],
                 interval=10,  # Should trigger status increase
-                status="new",
+                level="new",
                 tags=["tag1"],
                 sentence="Hola mundo",
                 importance=3,
@@ -34,7 +34,7 @@ class TestUIActionHandler:
                 word="mundo",
                 translations=["world"],
                 interval=2,  # Should trigger downgrade
-                status="recognized",
+                level="recognized",
                 tags=["tag2"],
                 sentence="Hola mundo",
                 importance=2,
@@ -45,7 +45,7 @@ class TestUIActionHandler:
                 word="casa",
                 translations=["house"],
                 interval=300,  # Very high interval should still only trigger single status increase
-                status="familiar",
+                level="familiar",
                 tags=["tag3"],
                 sentence="Mi casa es grande",
                 importance=4,
@@ -56,7 +56,7 @@ class TestUIActionHandler:
                 word="gracias",
                 translations=["thank you"],
                 interval=10,  # No status increase
-                status="recognized",
+                level="recognized",
                 tags=["tag4"],
                 sentence="Muchas gracias",
                 importance=3,
@@ -65,14 +65,14 @@ class TestUIActionHandler:
         ]
 
     @pytest.fixture
-    def sampleStatusToInterval(self):
+    def sampleLevelToInterval(self):
         return {"new": 0, "recognized": 5, "familiar": 10, "learned": 25, "known": 50}
 
     @pytest.fixture
-    def actionHandler(self, mockAddonManager, sampleStatusToInterval):
+    def actionHandler(self, mockAddonManager, sampleLevelToInterval):
         handler = ActionHandler(mockAddonManager)
         with patch.object(
-            handler.config, "GetStatusToInterval", return_value=sampleStatusToInterval
+            handler.config, "GetLevelToInterval", return_value=sampleLevelToInterval
         ):
             yield handler
 
@@ -81,10 +81,10 @@ class TestUIActionHandler:
         return {"increased": 105, "decreased": 68, "api_updates": 166}
 
     def test_prep_cards_for_update_only_increase(
-        self, actionHandler, sampleAnkiCards, sampleStatusToInterval
+        self, actionHandler, sampleAnkiCards, sampleLevelToInterval
     ):
         cardsToIncrease, cardsToDecrease = actionHandler._PrepCardsForUpdate(
-            sampleAnkiCards, sampleStatusToInterval, downgrade=False
+            sampleAnkiCards, sampleLevelToInterval, downgrade=False
         )
         assert len(cardsToIncrease) == 2
         assert len(cardsToDecrease) == 0  # No downgrades when downgrade=False
@@ -94,13 +94,13 @@ class TestUIActionHandler:
         assert "gracias" not in words
 
         # Check status increased one level on 'casa' card
-        assert "learned" in [card.status for card in cardsToIncrease if card.word == "casa"]
+        assert "learned" in [card.level for card in cardsToIncrease if card.word == "casa"]
 
     def test_prep_cards_for_update_increase_and_decrease(
-        self, actionHandler, sampleAnkiCards, sampleStatusToInterval
+        self, actionHandler, sampleAnkiCards, sampleLevelToInterval
     ):
         cardsToIncrease, cardsToDecrease = actionHandler._PrepCardsForUpdate(
-            sampleAnkiCards, sampleStatusToInterval, downgrade=True
+            sampleAnkiCards, sampleLevelToInterval, downgrade=True
         )
         assert len(cardsToIncrease) == 2
         assert len(cardsToDecrease) == 1
@@ -113,7 +113,7 @@ class TestUIActionHandler:
         assert "mundo" in decreaseWords
         assert "gracias" not in decreaseWords
 
-        assert "learned" in [card.status for card in cardsToIncrease if card.word == "casa"]
+        assert "learned" in [card.level for card in cardsToIncrease if card.word == "casa"]
 
     def test_integration_sync_with_real_mocks(
         self, actionHandler, mockLingqServer, mockMw, updateCounts
@@ -130,7 +130,7 @@ class TestUIActionHandler:
             if cardData["primary_key"] == testCardPk
         )
 
-        assert initialAnkiCard["status"] == "learned"
+        assert initialAnkiCard["level"] == "learned"
         assert initialAnkiCard["interval"] == 100
         assert initialLingqCard["status"] == 3
         assert initialLingqCard["extended_status"] == 0
@@ -149,30 +149,30 @@ class TestUIActionHandler:
         # Verify the card was updated in both databases
         assert finalLingqCard["status"] == 3
         assert finalLingqCard["extended_status"] == 3
-        assert finalAnkiCard["status"] == "known"
+        assert finalAnkiCard["level"] == "known"
 
         # Verify counts of cards calculated as needing to update
         # These counts are subject to change as the mock data is updated
         assert increased == updateCounts["increased"]
         assert decreased == updateCounts["decreased"]
         # This number does not match the number of `increased` and `decreased`
-        # because some cards are not updated due to the status in anki already being
-        # the same as the status in lingq
+        # because some cards are not updated due to the level in anki already being
+        # the same as the level in lingq
         assert apiUpdates == updateCounts["api_updates"]
 
     def test_integration_sync_with_real_mocks_different_status_to_interval(
-        self, actionHandler, mockLingqServer, mockMw, sampleStatusToInterval, updateCounts
+        self, actionHandler, mockLingqServer, mockMw, sampleLevelToInterval, updateCounts
     ):
         """Integration test using real mock json data with different status to interval."""
         deckName = "mock_deck"
 
         # Copy the sample status_to_interval but make it slightly different
-        mockGetStatusToInterval = {k: v + 3 for k, v in sampleStatusToInterval.items()}
+        mockGetStatusToInterval = {k: v + 3 for k, v in sampleLevelToInterval.items()}
         mockGetStatusToInterval["new"] = 0
 
         with patch.object(
             actionHandler.config,
-            "GetStatusToInterval",
+            "GetLevelToInterval",
             return_value=mockGetStatusToInterval,
         ):
             increased, decreased, apiUpdates = actionHandler.SyncLingqStatusToLingq(

@@ -38,7 +38,7 @@ class MockCard:
             self._note["LingqPK"] = str(self.card_data["primary_key"])
             self._note["Front"] = self.card_data["word"]
             self._note["Back"] = self.card_data["translations"]
-            self._note["LingqStatus"] = self.card_data["status"]
+            self._note["LingqLevel"] = self.card_data["level"]
             self._note["Sentence"] = self.card_data["sentence"]
             self._note["LingqImportance"] = str(self.card_data["importance"])
             self._note.tags = self.card_data.get("tags", [])
@@ -124,7 +124,7 @@ class MockMw(StrictMock):
                 "primary_key": int(note["LingqPK"]),
                 "word": note["Front"],
                 "translations": note["Back"],
-                "status": note["LingqStatus"],
+                "level": note["LingqLevel"],
                 "tags": note.tags,
                 "sentence": note["Sentence"],
                 "importance": int(note["LingqImportance"]),
@@ -142,7 +142,7 @@ class MockMw(StrictMock):
                     if card["primary_key"] == pk_to_find:
                         card["word"] = note["Front"]
                         card["translations"] = note["Back"]
-                        card["status"] = note["LingqStatus"]
+                        card["level"] = note["LingqLevel"]
                         card["tags"] = note.tags
                         card["sentence"] = note["Sentence"]
                         card["importance"] = int(note["LingqImportance"])

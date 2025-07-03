@@ -29,8 +29,8 @@ class TestGets:
         result = Config(addonManager).GetLanguageCode()
         assert result == "testLanguageCode"
 
-    def test_should_get_deafult_status_to_interval(self, addonManager):
-        result = Config(addonManager).GetStatusToInterval()
+    def test_should_get_default_level_to_interval(self, addonManager):
+        result = Config(addonManager).GetLevelToInterval()
         assert result == {"new": 0, "recognized": 5, "familiar": 13, "learned": 34, "known": 85}
 
 

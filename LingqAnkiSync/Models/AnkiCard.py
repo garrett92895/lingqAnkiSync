@@ -8,7 +8,7 @@ class AnkiCard:
     word: str
     translations: List[str]
     interval: int
-    status: str
+    level: str
     tags: List[str]
     sentence: str
     importance: int

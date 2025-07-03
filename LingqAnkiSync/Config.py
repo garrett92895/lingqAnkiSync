@@ -35,18 +35,18 @@ class Config:
     def SetLanguageCode(self, set_to: str):
         self._SetConfig("languageCode", set_to)
 
-    def GetStatusToInterval(self) -> Dict[str, int]:
+    def GetLevelToInterval(self) -> Dict[str, int]:
         # Using a default anki ease factor of 2.5, this should make it so
         # that you need to complete two reviews of a card before it updates in
-        # lingq with a higher known status
+        # lingq with a higher known level
         #
-        # e.g. card pulled from linq with status of 'recognized' (5 day review interval).
+        # e.g. card pulled from linq with level of 'recognized' (5 day review interval).
         # we see it and review it once correctly. card will still sync to lingq
-        # as a status of 'recognized' until we see that card again in 32.5 days and review
+        # as a level of 'recognized' until we see that card again in 32.5 days and review
         # correctly a second time.
         #
         # but also if we hit "easy" just once in anki then that will be sufficient
-        # to increase the status to the next level (except for new cards)
+        # to increase the level to the next level (except for new cards)
         return {
             Lingq.LEVEL_1: 0,
             Lingq.LEVEL_2: 5,

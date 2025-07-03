@@ -31,7 +31,7 @@ _noteFields = [
     "Front",
     "Back",
     "LingqPK",
-    "LingqStatus",
+    "LingqLevel",
     "Sentence",
     "LingqImportance",
     "FrontAudio",
@@ -61,7 +61,7 @@ def CreateNote(card: AnkiCard, deckName: str, languageCode: str) -> bool:
         f"{i+1}. {item}" for i, item in enumerate(card.translations)
     )
     note["LingqPK"] = str(card.primaryKey)
-    note["LingqStatus"] = str(card.status)
+    note["LingqLevel"] = str(card.level)
     note.tags = card.tags
     note["Sentence"] = card.sentence
     note["LingqImportance"] = str(card.importance)
@@ -119,10 +119,10 @@ def CreateNoteTypeIfNotExist(languageCode: str):
         CreateNoteType(languageCode)
 
 
-def UpdateCardStatus(deckName: str, lingqPk: int, status: str):
+def UpdateCardLevel(deckName: str, lingqPk: int, level: str):
     cardId = mw.col.find_cards(f'deck:"{deckName}" LingqPK:"{lingqPk}"')[0]
     card = mw.col.get_card(cardId)
-    card.note()["LingqStatus"] = status
+    card.note()["LingqLevel"] = level
     mw.col.update_note(card.note())
 
     # Anki seems to miss a few of them if the updates aren't spaced out. This isn't a perfect solution
@@ -155,7 +155,7 @@ def _CreateAnkiCardObject(card: Card, cardId: int) -> AnkiCard:
             "Back"
         ],  # TODO this needs to split or parse out the "1. [translation1] 2. [translation2]" etc
         interval=GetIntervalFromCard(cardId),
-        status=card.note()["LingqStatus"],
+        level=card.note()["LingqLevel"],
         tags=card.note().tags,
         sentence=card.note()["Sentence"],
         importance=card.note()["LingqImportance"],
