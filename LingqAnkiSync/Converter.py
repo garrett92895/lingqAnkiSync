@@ -79,14 +79,14 @@ def _IntervalToLingqStatus(interval: int, levelToInterval: Dict[str, int]) -> Tu
 
 def _IntervalToLevel(interval: int, levelToInterval: Dict[str, int]) -> str:
     if interval > levelToInterval[Lingq.LEVEL_KNOWN]:
-        level = Lingq.LEVEL_KNOWN
+        lingqLevel = Lingq.LEVEL_KNOWN
     else:
-        level = Lingq.LEVEL_1
-        for l in Lingq.LEVELS:
-            if interval > levelToInterval[l]:
-                level = l
+        lingqLevel = Lingq.LEVEL_1
+        for level in Lingq.LEVELS:
+            if interval > levelToInterval[level]:
+                lingqLevel = level
 
-    return level
+    return lingqLevel
 
 
 def LingqStatusToLevel(status: int, extendedStatus: int) -> str:
