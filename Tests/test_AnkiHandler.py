@@ -1,12 +1,12 @@
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch, MagicMock, ANY
 from LingqAnkiSync import AnkiHandler
 from LingqAnkiSync.Models.AnkiCard import AnkiCard
 from LingqAnkiSync.Models.Lingq import Lingq
 
 
 @pytest.fixture
-def sample_anki_card():
+def sampleAnkiCardObject():
     return AnkiCard(
         primaryKey=12345,
         word="test_word",
@@ -21,7 +21,7 @@ def sample_anki_card():
 
 
 @pytest.fixture
-def mock_anki_card():
+def mockInternalAnkiCard():
     mock_card = MagicMock()
     mock_card.id = 789
     mock_card.interval = 10
@@ -48,15 +48,15 @@ class TestCreateNote:
     @patch("LingqAnkiSync.AnkiHandler.CreateNoteTypeIfNotExist")
     @patch("LingqAnkiSync.AnkiHandler.DoesDuplicateCardExistInDeck")
     def test_create_note_returns_false_when_duplicate_exists(
-        self, mock_duplicate_check, mock_create_note_type, sample_anki_card
+        self, mock_duplicate_check, mock_create_note_type, sampleAnkiCardObject
     ):
         mock_duplicate_check.return_value = True
 
-        result = AnkiHandler.CreateNote(sample_anki_card, "test_deck", "es")
+        result = AnkiHandler.CreateNote(sampleAnkiCardObject, "test_deck", "es")
 
         assert result == False
         mock_duplicate_check.assert_called_once_with(
-            sample_anki_card.primaryKey, "test_deck"
+            sampleAnkiCardObject.primaryKey, "test_deck"
         )
         mock_create_note_type.assert_not_called()
 
@@ -64,7 +64,7 @@ class TestCreateNote:
     @patch("LingqAnkiSync.AnkiHandler.DoesDuplicateCardExistInDeck")
     @patch("LingqAnkiSync.AnkiHandler.mw")
     def test_create_note_when_no_duplicate_exists(
-        self, mock_mw, mock_duplicate_check, mock_create_note_type, sample_anki_card
+        self, mock_mw, mock_duplicate_check, mock_create_note_type, sampleAnkiCardObject
     ):
         mock_duplicate_check.return_value = False
 
@@ -78,20 +78,18 @@ class TestCreateNote:
         mock_note.id = note_id
 
         with patch("LingqAnkiSync.AnkiHandler.Note", return_value=mock_note):
-            result = AnkiHandler.CreateNote(sample_anki_card, "test_deck", "es")
+            result = AnkiHandler.CreateNote(sampleAnkiCardObject, "test_deck", "es")
 
         assert result
         mock_duplicate_check.assert_called_once_with(
-            sample_anki_card.primaryKey, "test_deck"
+            sampleAnkiCardObject.primaryKey, "test_deck"
         )
         mock_create_note_type.assert_called_once_with("es")
         mock_mw.col.models.byName.assert_called_once_with("lingqAnkiSync_es")
         mock_mw.col.add_note.assert_called_once_with(mock_note, deck_id)
         mock_mw.col.sched.set_due_date.assert_called_once_with(
-            [note_id], str(sample_anki_card.interval)
+            [note_id], str(sampleAnkiCardObject.interval)
         )
-
-        from unittest.mock import ANY
 
         mock_note.__setitem__.assert_any_call("LingqPK", ANY)
         mock_note.__setitem__.assert_any_call("Front", ANY)
@@ -105,11 +103,11 @@ class TestCreateNote:
 class TestCreateAnkiCardObject:
     @patch("LingqAnkiSync.AnkiHandler.GetIntervalFromCard")
     def test_create_anki_card_object_conversion(
-        self, mock_get_interval, mock_anki_card
+        self, mock_get_interval, mockInternalAnkiCard
     ):
-        mock_get_interval.side_effect = lambda card_id: mock_anki_card.interval
+        mock_get_interval.side_effect = lambda card_id: mockInternalAnkiCard.interval
 
-        result = AnkiHandler._CreateAnkiCardObject(mock_anki_card, mock_anki_card.id)
+        result = AnkiHandler._CreateAnkiCardObject(mockInternalAnkiCard, mockInternalAnkiCard.id)
 
         assert result.primaryKey == 67890
         assert result.word == "another_word"
@@ -124,7 +122,7 @@ class TestCreateAnkiCardObject:
         assert result.sentence == "another test sentence"
         assert result.importance == "2"
 
-        mock_get_interval.assert_called_once_with(mock_anki_card.id)
+        mock_get_interval.assert_called_once_with(mockInternalAnkiCard.id)
 
 
 class TestUpdateCardLevel:
