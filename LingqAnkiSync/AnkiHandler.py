@@ -38,6 +38,7 @@ _noteFields = [
     "SentenceAudio",
 ]
 
+
 def _GetModelName(languageCode: str) -> str:
     return f"lingqAnkiSync_{languageCode}"
 
@@ -128,6 +129,7 @@ def UpdateCardLevel(deckName: str, lingqPk: int, level: str):
     # Anki seems to miss a few of them if the updates aren't spaced out. This isn't a perfect solution
     time.sleep(0.1)
 
+
 def GetAllCardsInDeck(deckName: str) -> List[AnkiCard]:
     cards = []
     cardIds = mw.col.find_cards(f'deck:"{deckName}"')
@@ -151,8 +153,8 @@ def _CreateAnkiCardObject(card: Card, cardId: int) -> AnkiCard:
     return AnkiCard(
         primaryKey=int(card.note()["LingqPK"]),
         word=card.note()["Front"],
-        translations=card.note()[
-            "Back"
+        translations=[
+            card.note()["Back"]
         ],  # TODO this needs to split or parse out the "1. [translation1] 2. [translation2]" etc
         interval=GetIntervalFromCard(cardId),
         level=card.note()["LingqLevel"],

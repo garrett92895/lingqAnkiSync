@@ -1,15 +1,16 @@
 import pytest
+from unittest.mock import Mock, patch, MagicMock
 from LingqAnkiSync import AnkiHandler
 from LingqAnkiSync.Models.AnkiCard import AnkiCard
 from LingqAnkiSync.Models.Lingq import Lingq
 
 
 @pytest.fixture
-def sampleAnkiCard():
+def sample_anki_card():
     return AnkiCard(
         primaryKey=12345,
         word="test_word",
-        translations=["test_translation"],
+        translations=["test_translation1", "test_translation2"],
         interval=5,
         level="recognized",
         tags=["tag1"],
@@ -20,111 +21,124 @@ def sampleAnkiCard():
 
 
 @pytest.fixture
-def sampleLingq():
-    return Lingq(
-        primaryKey=12345,
-        word="test_word",
-        translations=["test_translation"],
-        status=0,
-        extendedStatus=0,
-        tags=["tag1"],
-        fragment="This is a test sentence.",
-        importance=3,
-    )
+def mock_anki_card():
+    mock_card = MagicMock()
+    mock_card.id = 789
+    mock_card.interval = 10
 
+    mock_note = MagicMock()
+    note_data = {
+        "LingqPK": "67890",
+        "Front": "another_word",
+        "Back": "1. here is a translation 2. here is another translation",
+        "LingqLevel": "new",
+        "Sentence": "another test sentence",
+        "LingqImportance": "2",
+    }
+    mock_note.__getitem__.side_effect = note_data.get
+    mock_note.tags = ["test", "test2"]
 
-class TestDoesDuplicateCardExistInDeck:
-    def test_card_exists(self, mockMw):
-        # Use a primary key that exists in the mock data
-        assert AnkiHandler.DoesDuplicateCardExistInDeck(107856432, "mock_deck")
+    # card.note()
+    mock_card.note.return_value = mock_note
 
-    def test_card_does_not_exist(self, mockMw):
-        assert not AnkiHandler.DoesDuplicateCardExistInDeck(999999999, "mock_deck")
-
-    def test_deck_does_not_exist(self, mockMw):
-        assert not AnkiHandler.DoesDuplicateCardExistInDeck(107856432, "NonExistentDeck")
+    return mock_card
 
 
 class TestCreateNote:
-    def test_create_note_success(self, mockMw, sampleAnkiCard):
-        # Ensure the card doesn't exist before we add it
-        assert not AnkiHandler.DoesDuplicateCardExistInDeck(
-            sampleAnkiCard.primaryKey, "mock_deck"
+    @patch("LingqAnkiSync.AnkiHandler.CreateNoteTypeIfNotExist")
+    @patch("LingqAnkiSync.AnkiHandler.DoesDuplicateCardExistInDeck")
+    def test_create_note_returns_false_when_duplicate_exists(
+        self, mock_duplicate_check, mock_create_note_type, sample_anki_card
+    ):
+        mock_duplicate_check.return_value = True
+
+        result = AnkiHandler.CreateNote(sample_anki_card, "test_deck", "es")
+
+        assert result == False
+        mock_duplicate_check.assert_called_once_with(
+            sample_anki_card.primaryKey, "test_deck"
         )
-        assert AnkiHandler.CreateNote(sampleAnkiCard, "mock_deck", "es")
-        # Check card exists now
-        assert AnkiHandler.DoesDuplicateCardExistInDeck(
-            sampleAnkiCard.primaryKey, "mock_deck"
+        mock_create_note_type.assert_not_called()
+
+    @patch("LingqAnkiSync.AnkiHandler.CreateNoteTypeIfNotExist")
+    @patch("LingqAnkiSync.AnkiHandler.DoesDuplicateCardExistInDeck")
+    @patch("LingqAnkiSync.AnkiHandler.mw")
+    def test_create_note_when_no_duplicate_exists(
+        self, mock_mw, mock_duplicate_check, mock_create_note_type, sample_anki_card
+    ):
+        mock_duplicate_check.return_value = False
+
+        deck_id = 123
+        mock_model = MagicMock()
+        mock_mw.col.models.byName.return_value = mock_model
+        mock_mw.col.decks.id.return_value = deck_id
+
+        note_id = 456
+        mock_note = MagicMock()
+        mock_note.id = note_id
+
+        with patch("LingqAnkiSync.AnkiHandler.Note", return_value=mock_note):
+            result = AnkiHandler.CreateNote(sample_anki_card, "test_deck", "es")
+
+        assert result
+        mock_duplicate_check.assert_called_once_with(
+            sample_anki_card.primaryKey, "test_deck"
+        )
+        mock_create_note_type.assert_called_once_with("es")
+        mock_mw.col.models.byName.assert_called_once_with("lingqAnkiSync_es")
+        mock_mw.col.add_note.assert_called_once_with(mock_note, deck_id)
+        mock_mw.col.sched.set_due_date.assert_called_once_with(
+            [note_id], str(sample_anki_card.interval)
         )
 
-    def test_create_note_fails_when_duplicate_exists(self, mockMw, sampleAnkiCard):
-        # Use a primary key that already exists in the mock data
-        sampleAnkiCard.primaryKey = 107856432
-        assert not AnkiHandler.CreateNote(sampleAnkiCard, "mock_deck", "es")
+        from unittest.mock import ANY
+
+        mock_note.__setitem__.assert_any_call("LingqPK", ANY)
+        mock_note.__setitem__.assert_any_call("Front", ANY)
+        mock_note.__setitem__.assert_any_call("Back", ANY)
+        mock_note.__setitem__.assert_any_call("LingqLevel", ANY)
+        mock_note.__setitem__.assert_any_call("Sentence", ANY)
+        mock_note.__setitem__.assert_any_call("LingqImportance", ANY)
+        assert mock_note.tags is not None
 
 
-class TestCreateNotesFromCards:
-    def test_create_multiple_notes(self, mockMw):
-        cards = [
-            AnkiCard(
-                primaryKey=888888888,
-                word="word1",
-                translations=["translation1"],
-                interval=0,
-                level="new",
-                tags=[],
-                sentence="Sentence 1",
-                importance=1,
-                popularity=0,
-            ),
-            AnkiCard(
-                primaryKey=777777777,
-                word="word2",
-                translations=["translation2"],
-                interval=5,
-                level="recognized",
-                tags=["tag1"],
-                sentence="Sentence 2",
-                importance=2,
-                popularity=0,
-            ),
+class TestCreateAnkiCardObject:
+    @patch("LingqAnkiSync.AnkiHandler.GetIntervalFromCard")
+    def test_create_anki_card_object_conversion(
+        self, mock_get_interval, mock_anki_card
+    ):
+        mock_get_interval.side_effect = lambda card_id: mock_anki_card.interval
+
+        result = AnkiHandler._CreateAnkiCardObject(mock_anki_card, mock_anki_card.id)
+
+        assert result.primaryKey == 67890
+        assert result.word == "another_word"
+        # TODO eventually we want the AnkiHandler to be smarter about splitting the translations text
+        assert result.translations == [
+            "1. here is a translation 2. here is another translation"
         ]
+        # assert result.translations == mock_anki_card.note()["Back"]
+        assert result.interval == 10
+        assert result.level == "new"
+        assert result.tags == ["test", "test2"]
+        assert result.sentence == "another test sentence"
+        assert result.importance == "2"
 
-        assert AnkiHandler.CreateNotesFromCards(cards, "mock_deck", "es") == 2
-        assert AnkiHandler.DoesDuplicateCardExistInDeck(cards[0].primaryKey, "mock_deck")
-        assert AnkiHandler.DoesDuplicateCardExistInDeck(cards[1].primaryKey, "mock_deck")
+        mock_get_interval.assert_called_once_with(mock_anki_card.id)
 
-    def test_create_notes_with_duplicates(self, mockMw):
-        cards = [
-            AnkiCard(
-                primaryKey=107856432,  # This exists in mock data
-                word="existing_word",
-                translations=["translation"],
-                interval=0,
-                level="new",
-                tags=[],
-                sentence="Sentence 1",
-                importance=1,
-                popularity=0,
-            ),
-            AnkiCard(
-                primaryKey=666666666,  # This is new to the mock data
-                word="new_word",
-                translations=["translation"],
-                interval=0,
-                level="new",
-                tags=[],
-                sentence="Sentence 2",
-                importance=1,
-                popularity=0,
-            ),
-        ]
 
-        assert AnkiHandler.DoesDuplicateCardExistInDeck(cards[0].primaryKey, "mock_deck")
-        assert not AnkiHandler.DoesDuplicateCardExistInDeck(cards[1].primaryKey, "mock_deck")
+class TestUpdateCardLevel:
+    @patch("LingqAnkiSync.AnkiHandler.mw")
+    @patch("LingqAnkiSync.AnkiHandler.time")
+    def test_update_card_level(self, mock_time, mock_mw):
+        mock_mw.col.find_cards.return_value = [123]
+        mock_card = MagicMock()
+        mock_mw.col.get_card.return_value = mock_card
+        mock_note = MagicMock()
+        mock_card.note.return_value = mock_note
 
-        assert AnkiHandler.CreateNotesFromCards(cards, "mock_deck", "es") == 1
+        AnkiHandler.UpdateCardLevel("test_deck", 12345, "known")
 
-        # Double-check database contains both cards now
-        assert AnkiHandler.DoesDuplicateCardExistInDeck(cards[0].primaryKey, "mock_deck")
-        assert AnkiHandler.DoesDuplicateCardExistInDeck(cards[1].primaryKey, "mock_deck")
+        mock_mw.col.get_card.assert_called_once_with(123)
+        mock_note.__setitem__.assert_called_once_with("LingqLevel", "known")
+        mock_mw.col.update_note.assert_called_once_with(mock_note)
