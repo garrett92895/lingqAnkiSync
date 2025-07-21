@@ -1,191 +1,288 @@
-import requests
-import time
-import math
+import pytest
+from requests.exceptions import HTTPError
+from unittest.mock import patch, MagicMock
 from LingqAnkiSync.LingqApi import LingqApi
 from LingqAnkiSync.Models.Lingq import Lingq
 
 
-class TestLingqApiMock:
-    def test_get_cards_basic(self, mockLingqServer):
-        response = requests.get("https://www.lingq.com/api/v3/es/cards/")
-        assert response.status_code == 200
+@pytest.fixture
+def sampleLingqObjects():
+    return [
+        Lingq(
+            primaryKey=1,
+            word="test_word_1",
+            translations=["test_translation_1a", "test_translation_1b"],
+            status=1,
+            extendedStatus=0,
+            tags=["test_tag_1"],
+            fragment="test_fragment_1",
+            importance=2,
+            popularity=5,
+        ),
+        Lingq(
+            primaryKey=2,
+            word="test_word_2",
+            translations=["test_translation_2"],
+            status=2,
+            extendedStatus=0,
+            tags=["test_tag_2"],
+            fragment="test_fragment_2",
+            importance=2,
+            popularity=4,
+        ),
+        Lingq(
+            primaryKey=3,
+            word="test_word_3",
+            translations=["test_translation_3"],
+            status=3,
+            extendedStatus=3,
+            tags=["test_tag_3"],
+            fragment="test_fragment_3",
+            importance=3,
+            popularity=5,
+        ),
+    ]
 
-        data = response.json()
-        assert "count" in data
-        assert "results" in data
-        assert isinstance(data["results"], list)
-        assert data["count"] > 0
 
-    def test_get_cards_pagination(self, mockLingqServer):
-        response1 = requests.get("https://www.lingq.com/api/v3/es/cards/?page=1&page_size=5")
-        assert response1.status_code == 200
+"""Factories to simplify creating mock responses"""
 
-        data1 = response1.json()
-        assert len(data1["results"]) <= 5
-        assert len(data1["results"]) > 0
 
-        response2 = requests.get("https://www.lingq.com/api/v3/es/cards/?page=2&page_size=5")
-        assert response2.status_code == 200
+@pytest.fixture
+def lingqApiGetCardsResponse():
+    def _factory(
+        lingqs: list,
+        count: int,
+        next_url: str = None,
+    ):
+        results_list = []
+        for lingq in lingqs:
+            results_list.append(
+                {
+                    "pk": lingq.primaryKey,
+                    "term": lingq.word,
+                    "status": lingq.status,
+                    "extended_status": lingq.extendedStatus,
+                    "tags": lingq.tags,
+                    "fragment": lingq.fragment,
+                    "importance": lingq.importance,
+                    "hints": [{"text": t, "popularity": 1} for t in lingq.translations],
+                }
+            )
 
-        data2 = response2.json()
-        # Verify pagination works by checking pages don't overlap
-        if len(data1["results"]) > 0 and len(data2["results"]) > 0:
-            page1Pks = {card["pk"] for card in data1["results"]}
-            page2Pks = {card["pk"] for card in data2["results"]}
-            assert page1Pks.isdisjoint(page2Pks), "Pages should not contain overlapping cards"
+        response_data = {"count": count, "next": next_url, "results": results_list}
 
-    def test_get_cards_status_filter(self, mockLingqServer):
-        # Get cards with status 0 (new)
-        response = requests.get("https://www.lingq.com/api/v3/es/cards/?status=0&status=2")
-        assert response.status_code == 200
+        # Create a mock response object that behaves like requests.Response
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = response_data
+        mock_response.raise_for_status.return_value = None  # Default to no exception
 
-        data = response.json()
-        for card in data["results"]:
-            assert (card["status"], card["extended_status"]) in [(0, 0), (2, 0)]
+        return mock_response
 
-    def test_get_cards_status_4_filter(self, mockLingqServer):
-        """Test status 4 filtering (status=3 AND extended_status=3)."""
-        # Test data should have some cards with status=3 and extended_status=3
-        # if not, it's better that the test fails
-        response = requests.get("https://www.lingq.com/api/v3/es/cards/?status=4")
-        assert response.status_code == 200
+    return _factory
 
-        data = response.json()
-        assert len(data["results"]) > 0
 
-        for card in data["results"]:
-            assert card["status"] == 3
-            assert card["extended_status"] == 3
+@pytest.fixture
+def lingqApiGetLevelResponse():
+    def _factory(status: int, extendedStatus: int):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "status": status,
+            "extended_status": extendedStatus,
+        }
 
-    def test_patch_card(self, mockLingqServer):
-        allCards = mockLingqServer.get_all_cards("es")
+        return mock_response
 
-        testCard = allCards[0]
-        newStatus = (testCard["status"] + 1) % 4  # Cycle through statuses 0-3
+    return _factory
 
-        patchResponse = requests.patch(
-            f'https://www.lingq.com/api/v3/es/cards/{testCard["pk"]}/',
-            data={"status": newStatus, "extended_status": 0},
+
+class TestLingqApi:
+    @patch("requests.get")
+    def test_get_lingqs_basic(
+        self, requestsGetMock, lingqApiGetCardsResponse, sampleLingqObjects
+    ):
+        page_1_response = lingqApiGetCardsResponse(
+            lingqs=sampleLingqObjects,
+            count=3,
         )
 
-        assert patchResponse.status_code == 200
+        requestsGetMock.return_value = page_1_response
 
-        updatedCard = patchResponse.json()
-        assert updatedCard["status"] == newStatus
-        assert updatedCard["extended_status"] == 0
-        assert updatedCard["pk"] == testCard["pk"]
-
-        cardFromDb = mockLingqServer.get_card_by_pk("es", testCard["pk"])
-        assert cardFromDb["status"] == newStatus
-
-    def test_patch_nonexistent_card(self, mockLingqServer):
-        response = requests.patch(
-            "https://www.lingq.com/api/v3/es/cards/999999999/", data={"status": 1}
-        )
-
-        assert response.status_code == 404
-        data = response.json()
-        assert "error" in data
-
-
-class TestLingqApiIntegration:
-    def test_get_lingqs_basic(self, mockLingqServer):
         api = LingqApi("test_api_key", "es")
         lingqs = api.GetLingqs(includeKnowns=True)
 
-        assert len(lingqs) > 0
+        assert len(lingqs) == 3
 
         for lingq in lingqs:
             assert isinstance(lingq, Lingq)
-            assert hasattr(lingq, "primaryKey")
-            assert hasattr(lingq, "word")
-            assert hasattr(lingq, "translations")
-            assert hasattr(lingq, "status")
 
-    def test_sync_statuses_to_lingq(self, mockLingqServer):
-        api = LingqApi("test_api_key", "es")
-
-        # Get a real card from our mock data
-        allCards = api.GetLingqs(includeKnowns=True)
-        testCard = allCards[0]
-        newStatus = (testCard.status + 1) % 4  # Cycle through statuses 0-3
-        assert testCard.status != newStatus
-
-        testLingq = Lingq(
-            primaryKey=testCard.primaryKey,
-            word=testCard.word,
-            translations=testCard.translations,
-            status=newStatus,
-            extendedStatus=0,
-            tags=testCard.tags,
-            fragment=testCard.fragment,
-            importance=testCard.importance,
+        assert requestsGetMock.call_count == 1
+        # test includeKnowns is adding a filter to the url
+        assert (
+            "&status=0&status=1&status=2&status=3"
+            not in requestsGetMock.call_args.kwargs["url"]
+        )
+        api.GetLingqs(includeKnowns=False)
+        assert (
+            "&status=0&status=1&status=2&status=3"
+            in requestsGetMock.call_args.kwargs["url"]
         )
 
-        api.SyncStatusesToLingq([testLingq])
-
-        updatedCard = mockLingqServer.get_card_by_pk("es", testCard.primaryKey)
-        assert updatedCard["status"] == newStatus
-        assert updatedCard["extended_status"] == 0
-
-
-class TestLingqApiRateLimiting:
-    def test_rate_limit_get_cards(self, mockLingqServer):
-        retryDelaySeconds = 2
-        mockLingqServer.enable_rate_limiting(retry_delay_seconds=retryDelaySeconds)
-        api = LingqApi("test_api_key", "es")
-
-        currentTime = time.time()
-        lingqs = api.GetLingqs(includeKnowns=False)
-        endTime = time.time()
-
-        # LingqApi.GetLingqs uses a page size of 200
-        numberOfPages = math.ceil(len(lingqs) / 200)
-        # numberOfPages-1 because the first page doesn't get rate limited
-        assert endTime - currentTime > (numberOfPages - 1) * retryDelaySeconds
-        assert endTime - currentTime > 1  # Ensure that it took at least 1 second
-
-        mockLingqServer.disable_rate_limiting()
-
-    def test_rate_limit_patch(self, mockLingqServer):
-        api = LingqApi("test_api_key", "es")
-        allCards = api.GetLingqs(includeKnowns=False)
-        testCardData1 = allCards[0]
-        testCardData2 = allCards[1]
-
-        retryDelaySeconds = 2
-        mockLingqServer.enable_rate_limiting(retry_delay_seconds=retryDelaySeconds)
-
-        testLingq1 = Lingq(
-            primaryKey=testCardData1.primaryKey,
-            word=testCardData1.word,
-            translations=testCardData1.translations,
-            status=(testCardData1.status + 1) % 4,
-            extendedStatus=0,
-            tags=testCardData1.tags,
-            fragment=testCardData1.fragment,
-            importance=testCardData1.importance,
+    @patch("requests.get")
+    def test_get_lingqs_paging(
+        self, requestsGetMock, lingqApiGetCardsResponse, sampleLingqObjects
+    ):
+        page_1_response = lingqApiGetCardsResponse(
+            lingqs=sampleLingqObjects[:2],
+            count=2,
+            next_url="https://www.lingq.com/api/v3/es/cards/?page=2&page_size=2",
+        )
+        page_2_response = lingqApiGetCardsResponse(
+            lingqs=sampleLingqObjects[2:],
+            count=1,
         )
 
-        testLingq2 = Lingq(
-            primaryKey=testCardData2.primaryKey,
-            word=testCardData2.word,
-            translations=testCardData2.translations,
-            status=(testCardData2.status + 1) % 4,
-            extendedStatus=0,
-            tags=testCardData2.tags,
-            fragment=testCardData2.fragment,
-            importance=testCardData2.importance,
+        requestsGetMock.side_effect = [page_1_response, page_2_response]
+
+        api = LingqApi("test_api_key", "es")
+        lingqs = api.GetLingqs(includeKnowns=True)
+
+        assert len(lingqs) == 3
+
+        for lingq in lingqs:
+            assert isinstance(lingq, Lingq)
+
+        assert requestsGetMock.call_count == 2
+
+    @patch("time.sleep")
+    @patch("requests.get")
+    def test_with_retry(
+        self,
+        requestsGetMock,
+        timeSleepMock,
+        lingqApiGetCardsResponse,
+        sampleLingqObjects,
+    ):
+        responses = [
+            lingqApiGetCardsResponse(
+                lingqs=sampleLingqObjects[:2],
+                count=2,
+                next_url="https://www.lingq.com/api/v3/es/cards/?page=2&page_size=2",
+            ),
+            # Will be the bad response that triggers the retry
+            lingqApiGetCardsResponse(
+                lingqs=[],
+                count=0,
+            ),
+            lingqApiGetCardsResponse(
+                lingqs=sampleLingqObjects[2:],
+                count=1,
+            ),
+        ]
+
+        # Make second response 429 and trigger retry
+        retryAfterDelaySeconds = 2
+        responses[1].status_code = 429
+        responses[1].headers = {"Retry-After": str(retryAfterDelaySeconds)}
+        responses[1].raise_for_status.side_effect = HTTPError(
+            "429 Client Error: Too Many Requests"
         )
 
-        currentTime = time.time()
-        # First PATCH succeeds (establishes checkpoint)
-        api.SyncStatusesToLingq([testLingq1])
-        # Second PATCH should be rate limited and take time due to retry
-        api.SyncStatusesToLingq([testLingq2])
-        endTime = time.time()
+        requestsGetMock.side_effect = responses
 
-        assert endTime - currentTime > retryDelaySeconds
-        assert endTime - currentTime > 1  # Ensure that it took at least 1 second
+        api = LingqApi("test_api_key", "es")
+        lingqs = api.GetLingqs(includeKnowns=True)
 
-        mockLingqServer.disable_rate_limiting()
+        assert len(lingqs) == 3
+
+        for lingq in lingqs:
+            assert isinstance(lingq, Lingq)
+
+        assert requestsGetMock.call_count == 3
+        assert timeSleepMock.call_count == 1
+        assert timeSleepMock.call_args[0][0] >= retryAfterDelaySeconds
+
+    @patch("requests.get")
+    def test_get_level(self, requestsGetMock, lingqApiGetLevelResponse):
+        requestsGetMock.side_effect = [
+            lingqApiGetLevelResponse(0, 0),
+            lingqApiGetLevelResponse(1, 0),
+            lingqApiGetLevelResponse(2, 0),
+            lingqApiGetLevelResponse(3, 0),
+            lingqApiGetLevelResponse(3, 3),
+        ]
+
+        api = LingqApi("test_api_key", "es")
+        level = api._GetLevel(1)
+        assert level == Lingq.LEVEL_1
+        assert requestsGetMock.call_count == 1
+        assert (
+            requestsGetMock.call_args.kwargs["url"]
+            == "https://www.lingq.com/api/v3/es/cards/1/"
+        )
+
+        level = api._GetLevel(2)
+        assert level == Lingq.LEVEL_2
+        level = api._GetLevel(3)
+        assert level == Lingq.LEVEL_3
+        level = api._GetLevel(4)
+        assert level == Lingq.LEVEL_4
+        level = api._GetLevel(5)
+        assert level == Lingq.LEVEL_KNOWN
+
+    @patch("requests.get")
+    def test_should_update(
+        self, requestsGetMock, lingqApiGetLevelResponse, sampleLingqObjects
+    ):
+        requestsGetMock.side_effect = [
+            lingqApiGetLevelResponse(1, 0),
+            lingqApiGetLevelResponse(3, 0),
+            lingqApiGetLevelResponse(3, 3),
+        ]
+
+        api = LingqApi("test_api_key", "es")
+        assert not api._ShouldUpdate(sampleLingqObjects[0])
+        assert api._ShouldUpdate(sampleLingqObjects[1])
+        assert not api._ShouldUpdate(sampleLingqObjects[2])
+
+    @patch("time.sleep")
+    @patch("requests.patch")
+    @patch("requests.get")
+    def test_sync_statuses_to_lingq(
+        self,
+        requestsGetMock,
+        requestsPatchMock,
+        timeSleepMock,
+        lingqApiGetLevelResponse,
+        sampleLingqObjects,
+    ):
+        responses = [
+            lingqApiGetLevelResponse(1, 0),
+            # Will be the bad response that triggers the retry
+            lingqApiGetLevelResponse(-1, -1),
+            lingqApiGetLevelResponse(3, 0),
+            lingqApiGetLevelResponse(3, 3),
+        ]
+        # Make second response 429 and trigger retry
+        retryAfterDelaySeconds = 2
+        responses[1].status_code = 429
+        responses[1].headers = {"Retry-After": str(retryAfterDelaySeconds)}
+        responses[1].raise_for_status.side_effect = HTTPError(
+            "429 Client Error: Too Many Requests"
+        )
+
+        requestsGetMock.side_effect = responses
+
+        api = LingqApi("test_api_key", "es")
+        progressCallback = MagicMock()
+        assert (
+            api.SyncStatusesToLingq(
+                lingqs=sampleLingqObjects, progressCallback=progressCallback
+            )
+            == 1
+        )
+        assert requestsGetMock.call_count == 4
+        assert requestsPatchMock.call_count == 1
+        assert timeSleepMock.call_count > 0
+        assert progressCallback.call_count > 0

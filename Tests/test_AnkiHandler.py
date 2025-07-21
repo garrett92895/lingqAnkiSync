@@ -1,8 +1,7 @@
 import pytest
-from unittest.mock import Mock, patch, MagicMock, ANY
+from unittest.mock import patch, MagicMock, ANY
 from LingqAnkiSync import AnkiHandler
 from LingqAnkiSync.Models.AnkiCard import AnkiCard
-from LingqAnkiSync.Models.Lingq import Lingq
 
 
 @pytest.fixture
@@ -52,9 +51,8 @@ class TestCreateNote:
     ):
         mock_duplicate_check.return_value = True
 
-        result = AnkiHandler.CreateNote(sampleAnkiCardObject, "test_deck", "es")
+        assert not AnkiHandler.CreateNote(sampleAnkiCardObject, "test_deck", "es")
 
-        assert result == False
         mock_duplicate_check.assert_called_once_with(
             sampleAnkiCardObject.primaryKey, "test_deck"
         )
@@ -107,7 +105,9 @@ class TestCreateAnkiCardObject:
     ):
         mock_get_interval.side_effect = lambda card_id: mockInternalAnkiCard.interval
 
-        result = AnkiHandler._CreateAnkiCardObject(mockInternalAnkiCard, mockInternalAnkiCard.id)
+        result = AnkiHandler._CreateAnkiCardObject(
+            mockInternalAnkiCard, mockInternalAnkiCard.id
+        )
 
         assert result.primaryKey == 67890
         assert result.word == "another_word"
