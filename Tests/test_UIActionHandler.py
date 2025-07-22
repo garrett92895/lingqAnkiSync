@@ -23,9 +23,7 @@ def sampleLevelToInterval():
 @pytest.fixture
 def actionHandler(mockAddonManager, sampleLevelToInterval):
     handler = ActionHandler(mockAddonManager)
-    with patch.object(
-        handler.config, "GetLevelToInterval", return_value=sampleLevelToInterval
-    ):
+    with patch.object(handler.config, "GetLevelToInterval", return_value=sampleLevelToInterval):
         yield handler
 
 
@@ -128,27 +126,25 @@ class TestUIActionHandler:
         mockConverter.assert_called_once_with(
             sampleLingqs, actionHandler.config.GetLevelToInterval()
         )
-        mockAnkiHandler.CreateNotesFromCards.assert_called_once_with(
-            mockCards, "TestDeck", "es"
-        )
+        mockAnkiHandler.CreateNotesFromCards.assert_called_once_with(mockCards, "TestDeck", "es")
 
     @patch("LingqAnkiSync.UIActionHandler.AnkiHandler")
-    @patch.object(LingqApi, 'SyncStatusesToLingq')
+    @patch.object(LingqApi, "SyncStatusesToLingq")
     def test_sync_lingq_status_with_progress_callback(
         self, mockSyncStatuses, mockAnkiHandler, actionHandler, sampleAnkiCards
     ):
         mockSyncStatuses.return_value = 5
         mockAnkiHandler.GetAllCardsInDeck.return_value = sampleAnkiCards
         progressCallback = Mock()
-        
+
         actionHandler.SyncLingqStatusToLingq("TestDeck", progressCallback=progressCallback)
-        
+
         mockSyncStatuses.assert_called_once()
         args = mockSyncStatuses.call_args[0]
         assert args[1] == progressCallback
 
     @patch("LingqAnkiSync.UIActionHandler.AnkiHandler")
-    @patch.object(LingqApi, 'SyncStatusesToLingq')
+    @patch.object(LingqApi, "SyncStatusesToLingq")
     @patch("LingqAnkiSync.UIActionHandler.AnkiCardsToLingqs")
     def test_sync_lingq_status_to_lingq(
         self,
@@ -192,9 +188,7 @@ class TestUIActionHandler:
         assert "test_word_1" in words
         assert "test_word_4" not in words
 
-        assert "learned" in [
-            card.level for card in cardsToIncrease if card.word == "test_word_3"
-        ]
+        assert "learned" in [card.level for card in cardsToIncrease if card.word == "test_word_3"]
 
     def test_prep_cards_for_update_increase_and_decrease(
         self, actionHandler, sampleAnkiCards, sampleLevelToInterval
@@ -213,9 +207,7 @@ class TestUIActionHandler:
         assert "test_word_2" in decreaseWords
         assert "test_word_4" not in decreaseWords
 
-        assert "learned" in [
-            card.level for card in cardsToIncrease if card.word == "test_word_3"
-        ]
+        assert "learned" in [card.level for card in cardsToIncrease if card.word == "test_word_3"]
 
     def test_check_language_code_valid(self, actionHandler):
         actionHandler._CheckLanguageCode("es")

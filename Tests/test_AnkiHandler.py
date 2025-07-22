@@ -53,9 +53,7 @@ class TestCreateNote:
 
         assert not AnkiHandler.CreateNote(sampleAnkiCardObject, "test_deck", "es")
 
-        mock_duplicate_check.assert_called_once_with(
-            sampleAnkiCardObject.primaryKey, "test_deck"
-        )
+        mock_duplicate_check.assert_called_once_with(sampleAnkiCardObject.primaryKey, "test_deck")
         mock_create_note_type.assert_not_called()
 
     @patch("LingqAnkiSync.AnkiHandler.CreateNoteTypeIfNotExist")
@@ -79,9 +77,7 @@ class TestCreateNote:
             result = AnkiHandler.CreateNote(sampleAnkiCardObject, "test_deck", "es")
 
         assert result
-        mock_duplicate_check.assert_called_once_with(
-            sampleAnkiCardObject.primaryKey, "test_deck"
-        )
+        mock_duplicate_check.assert_called_once_with(sampleAnkiCardObject.primaryKey, "test_deck")
         mock_create_note_type.assert_called_once_with("es")
         mock_mw.col.models.byName.assert_called_once_with("lingqAnkiSync_es")
         mock_mw.col.add_note.assert_called_once_with(mock_note, deck_id)
@@ -100,21 +96,15 @@ class TestCreateNote:
 
 class TestCreateAnkiCardObject:
     @patch("LingqAnkiSync.AnkiHandler.GetIntervalFromCard")
-    def test_create_anki_card_object_conversion(
-        self, mock_get_interval, mockInternalAnkiCard
-    ):
+    def test_create_anki_card_object_conversion(self, mock_get_interval, mockInternalAnkiCard):
         mock_get_interval.side_effect = lambda card_id: mockInternalAnkiCard.interval
 
-        result = AnkiHandler._CreateAnkiCardObject(
-            mockInternalAnkiCard, mockInternalAnkiCard.id
-        )
+        result = AnkiHandler._CreateAnkiCardObject(mockInternalAnkiCard, mockInternalAnkiCard.id)
 
         assert result.primaryKey == 67890
         assert result.word == "another_word"
         # TODO eventually we want the AnkiHandler to be smarter about splitting the translations text
-        assert result.translations == [
-            "1. here is a translation 2. here is another translation"
-        ]
+        assert result.translations == ["1. here is a translation 2. here is another translation"]
         # assert result.translations == mock_anki_card.note()["Back"]
         assert result.interval == 10
         assert result.level == "new"

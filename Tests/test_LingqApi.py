@@ -97,9 +97,7 @@ def lingqApiGetLevelResponse():
 
 class TestLingqApi:
     @patch("requests.get")
-    def test_get_lingqs_basic(
-        self, requestsGetMock, lingqApiGetCardsResponse, sampleLingqObjects
-    ):
+    def test_get_lingqs_basic(self, requestsGetMock, lingqApiGetCardsResponse, sampleLingqObjects):
         page_1_response = lingqApiGetCardsResponse(
             lingqs=sampleLingqObjects,
             count=3,
@@ -117,20 +115,12 @@ class TestLingqApi:
 
         assert requestsGetMock.call_count == 1
         # test includeKnowns is adding a filter to the url
-        assert (
-            "&status=0&status=1&status=2&status=3"
-            not in requestsGetMock.call_args.kwargs["url"]
-        )
+        assert "&status=0&status=1&status=2&status=3" not in requestsGetMock.call_args.kwargs["url"]
         api.GetLingqs(includeKnowns=False)
-        assert (
-            "&status=0&status=1&status=2&status=3"
-            in requestsGetMock.call_args.kwargs["url"]
-        )
+        assert "&status=0&status=1&status=2&status=3" in requestsGetMock.call_args.kwargs["url"]
 
     @patch("requests.get")
-    def test_get_lingqs_paging(
-        self, requestsGetMock, lingqApiGetCardsResponse, sampleLingqObjects
-    ):
+    def test_get_lingqs_paging(self, requestsGetMock, lingqApiGetCardsResponse, sampleLingqObjects):
         page_1_response = lingqApiGetCardsResponse(
             lingqs=sampleLingqObjects[:2],
             count=2,
@@ -183,9 +173,7 @@ class TestLingqApi:
         retryAfterDelaySeconds = 2
         responses[1].status_code = 429
         responses[1].headers = {"Retry-After": str(retryAfterDelaySeconds)}
-        responses[1].raise_for_status.side_effect = HTTPError(
-            "429 Client Error: Too Many Requests"
-        )
+        responses[1].raise_for_status.side_effect = HTTPError("429 Client Error: Too Many Requests")
 
         requestsGetMock.side_effect = responses
 
@@ -215,10 +203,7 @@ class TestLingqApi:
         level = api._GetLevel(1)
         assert level == Lingq.LEVEL_1
         assert requestsGetMock.call_count == 1
-        assert (
-            requestsGetMock.call_args.kwargs["url"]
-            == "https://www.lingq.com/api/v3/es/cards/1/"
-        )
+        assert requestsGetMock.call_args.kwargs["url"] == "https://www.lingq.com/api/v3/es/cards/1/"
 
         level = api._GetLevel(2)
         assert level == Lingq.LEVEL_2
@@ -230,9 +215,7 @@ class TestLingqApi:
         assert level == Lingq.LEVEL_KNOWN
 
     @patch("requests.get")
-    def test_should_update(
-        self, requestsGetMock, lingqApiGetLevelResponse, sampleLingqObjects
-    ):
+    def test_should_update(self, requestsGetMock, lingqApiGetLevelResponse, sampleLingqObjects):
         requestsGetMock.side_effect = [
             lingqApiGetLevelResponse(1, 0),
             lingqApiGetLevelResponse(3, 0),
@@ -266,18 +249,14 @@ class TestLingqApi:
         retryAfterDelaySeconds = 2
         responses[1].status_code = 429
         responses[1].headers = {"Retry-After": str(retryAfterDelaySeconds)}
-        responses[1].raise_for_status.side_effect = HTTPError(
-            "429 Client Error: Too Many Requests"
-        )
+        responses[1].raise_for_status.side_effect = HTTPError("429 Client Error: Too Many Requests")
 
         requestsGetMock.side_effect = responses
 
         api = LingqApi("test_api_key", "es")
         progressCallback = MagicMock()
         assert (
-            api.SyncStatusesToLingq(
-                lingqs=sampleLingqObjects, progressCallback=progressCallback
-            )
+            api.SyncStatusesToLingq(lingqs=sampleLingqObjects, progressCallback=progressCallback)
             == 1
         )
         assert requestsGetMock.call_count == 4
