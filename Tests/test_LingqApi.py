@@ -44,9 +44,7 @@ def sampleLingqObjects():
     ]
 
 
-"""Factories to simplify creating mock responses"""
-
-
+# Factories to simplify creating mock responses
 @pytest.fixture
 def lingqApiGetCardsResponse():
     def _factory(
