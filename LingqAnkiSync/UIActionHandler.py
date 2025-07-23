@@ -24,7 +24,7 @@ class ActionHandler:
 
     def SyncLingqStatusToLingq(
         self, deckName: str, downgrade: bool = False, progressCallback=None
-    ) -> Tuple[int, int, int]:
+    ) -> Tuple[int, int, int, int]:
         apiKey = self.config.GetApiKey()
         languageCode = self.config.GetLanguageCode()
         levelToInterval = self.config.GetLevelToInterval()
@@ -32,7 +32,7 @@ class ActionHandler:
         self._CheckLanguageCode(languageCode)
 
         cards = AnkiHandler.GetAllCardsInDeck(deckName)
-        cardsToIncrease, cardsToDecrease = self._PrepCardsForUpdate(
+        cardsToIncrease, cardsToDecrease, cardsToIgnore = self._PrepCardsForUpdate(
             cards, levelToInterval, downgrade
         )
         cardsToUpdate = cardsToIncrease + cardsToDecrease
@@ -43,7 +43,7 @@ class ActionHandler:
         )
         self._UpdateNotesInAnki(deckName, cardsToUpdate)
 
-        return len(cardsToIncrease), len(cardsToDecrease), successfulUpdates
+        return len(cardsToIncrease), len(cardsToDecrease), len(cardsToIgnore), successfulUpdates
 
     def _CheckLanguageCode(self, languageCode: str):
         if languageCode not in lingqLangcodes:
@@ -57,27 +57,32 @@ class ActionHandler:
         """pre-checking if cards should update, to limit API calls later on
         and prepping card for update in anki db
 
-        :returns two lists of cards that need to be updated in LingQ
+        :returns three lists of cards that need to be updated in LingQ or ignored due to not being the write noteType
         """
         cardsToIncrease = []
         cardsToDecrease = []
+        cardsToIgnore = []
 
         for card in ankiCards:
-            nextLevel = Lingq.GetNextLevel(card.level)
-            prevLevel = Lingq.GetPrevLevel(card.level)
-            if nextLevel is not None and (card.interval > levelToInterval[nextLevel]):
-                card.level = nextLevel
-                cardsToIncrease.append(card)
+            # If the card is not using our schema
+            if card.level is None:
+                cardsToIgnore.append(card)
+            else:
+               nextLevel = Lingq.GetNextLevel(card.level)
+               prevLevel = Lingq.GetPrevLevel(card.level)
+               if nextLevel is not None and (card.interval > levelToInterval[nextLevel]):
+                   card.level = nextLevel
+                   cardsToIncrease.append(card)
 
-            if (
-                downgrade
-                and prevLevel is not None
-                and card.interval < levelToInterval[card.level]
-            ):
-                card.level = prevLevel
-                cardsToDecrease.append(card)
+               if (
+                   downgrade
+                   and prevLevel is not None
+                   and card.interval < levelToInterval[card.level]
+               ):
+                   card.level = prevLevel
+                   cardsToDecrease.append(card)
 
-        return cardsToIncrease, cardsToDecrease
+        return cardsToIncrease, cardsToDecrease, cardsToIgnore
 
     def _UpdateNotesInAnki(self, deckName: str, cards: List[AnkiCard]):
         for card in cards:

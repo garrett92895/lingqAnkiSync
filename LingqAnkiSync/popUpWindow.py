@@ -104,7 +104,7 @@ class UI:
             Args:
                 current: Current progress count
                 total: Total items to process
-                rateLimitSeconds: Integer seconds remaining if we're in a rate limit wait, None otherwise  
+                rateLimitSeconds: Integer seconds remaining if we're in a rate limit wait, None otherwise
             """
             if rateLimitSeconds:
                 mw.taskman.run_on_main(
@@ -137,7 +137,9 @@ class UI:
 
     def SuccesfulSync(self, result):
         mw.reset()
-        showInfo(f"Sync complete! {result[0]} lingqs increased and {result[1]} decreased!")
+        showInfo(
+            f"Sync complete! {result[0]} lingqs increased and {result[1]} decreased! {result[2]} cards ignored due to missing LingqLevel field"
+        )
 
 
 def InitializeAnkiMenu():
