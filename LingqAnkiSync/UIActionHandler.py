@@ -57,7 +57,7 @@ class ActionHandler:
         """pre-checking if cards should update, to limit API calls later on
         and prepping card for update in anki db
 
-        :returns three lists of cards that need to be updated in LingQ or ignored due to not being the write noteType
+        :returns three lists of cards that need to be updated in LingQ or ignored due to not being the right noteType
         """
         cardsToIncrease = []
         cardsToDecrease = []
